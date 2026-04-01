@@ -1,0 +1,41 @@
+@import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-brand-offwhite text-gray-800 font-body antialiased selection:bg-brand-gold selection:text-white;
+    min-height: 100vh;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display tracking-tight text-gray-900;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex justify-center items-center px-6 py-3 border border-transparent 
+           text-base font-medium rounded-lg shadow-sm text-white bg-brand-green 
+           hover:bg-brand-green-dark focus:outline-none focus:ring-2 focus:ring-offset-2 
+           focus:ring-brand-green transition-all duration-300;
+  }
+  
+  .btn-secondary {
+    @apply inline-flex justify-center items-center px-6 py-3 border border-brand-green 
+           text-base font-medium rounded-lg text-brand-green bg-transparent
+           hover:bg-brand-green hover:text-white focus:outline-none focus:ring-2 
+           focus:ring-offset-2 focus:ring-brand-green transition-all duration-300;
+  }
+  
+  .input-field {
+    @apply block w-full rounded-lg border-gray-300 shadow-sm focus:border-brand-gold 
+           focus:ring-brand-gold sm:text-base border p-3;
+  }
+  
+  .card-premium {
+    @apply bg-white rounded-xl shadow-premium border border-gray-100 p-6;
+  }
+}
