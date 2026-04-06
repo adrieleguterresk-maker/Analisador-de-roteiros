@@ -307,7 +307,7 @@ async function analisarRoteiroTexto(listaRoteiros, nicho) {
   ];
 
   const response = await getOpenAI().chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-4o-mini",
     messages: [
       { role: "system", content: SYSTEM_PROMPT + "\n" + MULTIPLE_SCRIPTS_SYSTEM_PROMPT },
       { role: "user", content: userPrompt }

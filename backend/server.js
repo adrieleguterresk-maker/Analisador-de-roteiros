@@ -38,10 +38,9 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // Permitir CORS de qualquer origem para facilitar o deploy inicial
 // (Em produção real, você pode substituir * pelo seu domínio do Netlify)
-app.use(cors({ origin: '*' })); 
-
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(cors());
+app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ limit: '20mb', extended: true }));
 
 // Rotas de Teste e Setup
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
