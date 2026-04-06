@@ -3,9 +3,15 @@ const fs = require('fs');
 
 let _openai = null;
 function getOpenAI() {
+  const apiKey = process.env.OPENAI_API_KEY;
+  
+  if (!apiKey) {
+    throw new Error('A chave de API da OpenAI (OPENAI_API_KEY) não foi detectada. Verifique as variáveis no painel da Vercel.');
+  }
+
   if (!_openai) {
     _openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey: apiKey,
     });
   }
   return _openai;

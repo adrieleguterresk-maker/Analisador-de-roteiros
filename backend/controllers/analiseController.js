@@ -30,6 +30,12 @@ async function processarAnalise(req, res) {
     const { tipoInput, tipoConteudo, nicho, texto, images: imagesRaw, roteirosConfigurados: roteirosRaw } = req.body;
     
     console.log('--- INÍCIO DA ANÁLISE ---');
+    
+    // Verificação de segurança: O banco de dados está online?
+    if (!supabase) {
+      return res.status(503).json({ error: 'Erro de Configuração: O banco de dados (Supabase) não foi detectado. Verifique as variáveis no painel da Vercel.' });
+    }
+    
     console.log('Tipo Input:', tipoInput);
     console.log('Nicho:', nicho);
     
