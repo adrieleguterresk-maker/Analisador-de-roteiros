@@ -57,6 +57,11 @@ async function startServer() {
   }
 }
 
-startServer().catch(err => {
-    console.error('Erro não tratado na inicialização:', err);
-});
+// Exportar o app para a Vercel
+module.exports = app;
+
+if (require.main === module) {
+  startServer().catch(err => {
+      console.error('Erro não tratado na inicialização:', err);
+  });
+}
