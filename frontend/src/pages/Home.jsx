@@ -145,8 +145,20 @@ export default function Home() {
         navigate(`/analise/${response.data.id}`, { state: { result: response.data } });
       }
     } catch (err) {
-      console.error(err);
-      const msg = err.response?.data?.error || "Falha ao conectar com o servidor. Tente novamente mais tarde.";
+      console.error('Erro detalhado:', err);
+      let msg = "Falha ao conectar com o servidor.";
+      
+      if (err.response?.data?.error) {
+        msg = typeof err.response.data.error === 'string' 
+          ? err.response.data.error 
+          : JSON.stringify(err.response.data.error);
+      } else if (err.message) {
+        msg = err.message;
+      }
+      
+      if (msg.includes('504')) msg = "O servidor demorou muito para responder (Timeout). Tente um roteiro mais curto.";
+      if (msg.includes('500')) msg = "Erro interno no servidor (500). Verifique as chaves de API.";
+      
       setErrorStatus(msg);
     } finally {
       setIsLoading(false);
