@@ -1,14 +1,13 @@
-// --- AJUSTE CIRÚRGICO VERCEL ---
-// Polyfills básicos para evitar erro do pdf-parse (pdf.js) em ambiente node puro
+// --- AJUSTE NATIVO VERCEL ---
+// Polyfills indispensáveis para pdf-parse (pdf.js) em ambiente serverless
 global.DOMMatrix = class {};
 global.DOMMatrixReadOnly = class {};
-// ------------------------------
+// ---------------------------
 
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const multer = require('multer');
-const path = require('path');
 const analiseController = require('./controllers/analiseController');
 const extrairController = require('./controllers/extrairController');
 const historicoController = require('./controllers/historicoController');
@@ -16,72 +15,41 @@ const historicoController = require('./controllers/historicoController');
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-// Rota de Diagnóstico Cirúrgico
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-    env: {
-      has_openai: !!process.env.OPENAI_API_KEY,
-      has_supabase: !!process.env.SUPABASE_URL
-    }
-  });
-});
-
-// Configuração do Multer para upload temporário
-// Em serverless (Vercel), não há sistema de arquivos gravável.
-// Por isso usamos memoryStorage — os arquivos ficam em RAM como Buffer.
+// Configuração de Memória para Uploads (Essencial para Vercel)
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Permitir CORS de qualquer origem para facilitar o deploy inicial
-// (Em produção real, você pode substituir * pelo seu domínio do Netlify)
+// Middleware de Limite de Dados (Payload 20MB)
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ limit: '20mb', extended: true }));
 
-// Rotas de Teste e Setup
-app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+// Rota de Diagnóstico Vercel
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    env: {
+      openai: !!process.env.OPENAI_API_KEY,
+      supabase: !!process.env.SUPABASE_URL
+    }
+  });
+});
 
-// Rotas de Extração de Texto para confirmação do usuário
+// Rotas de Serviço
 app.post('/api/extrair', upload.single('file'), extrairController.extrairTexto);
-
-// Rotas de Análise (Aba Unificada de Roteiro aceita arquivo ou texto)
 app.post('/api/analisar', upload.single('file'), analiseController.processarAnalise);
-
-// Rotas de Histórico
 app.get('/api/historico', historicoController.listarHistorico);
 app.get('/api/historico/:id', historicoController.detalheAnalise);
 app.delete('/api/historico/:id', historicoController.excluirAnalise);
 
-const { supabase } = require('./database/supabase');
-
-async function startServer() {
-  try {
-    // Verificação simples de conexão com Supabase no boot
-    const { data, error } = await supabase.from('analises').select('id').limit(1);
-    if (error) {
-      console.warn('AVISO: Não foi possível conectar ao Supabase no início:', error.message);
-    } else {
-      console.log('Conexão com Supabase estabelecida com sucesso.');
-    }
-
-    app.listen(PORT, () => {
-      console.log(`Servidor backend rodando na porta ${PORT}`);
-    });
-  } catch (err) {
-    console.error('FALHA AO INICIAR SERVIDOR:', err);
-    process.exit(1);
-  }
-}
-
-// Exportar o app para a Vercel
+// PADRÃO VERCEL: Exportar o app em vez de dar .listen()
 module.exports = app;
 
-if (require.main === module) {
-  startServer().catch(err => {
-      console.error('Erro não tratado na inicialização:', err);
+// Caso queira rodar localmente, o comando npm run dev continuará funcionando
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`[LOCAL] Servidor backend rodando na porta ${PORT}`);
   });
 }
