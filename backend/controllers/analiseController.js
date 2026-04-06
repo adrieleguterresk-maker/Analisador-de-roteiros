@@ -6,21 +6,21 @@ const mammoth = require('mammoth');
 const fs = require('fs');
 
 async function extractTextFromFile(file) {
-  const filePath = file.path;
   const mimeType = file.mimetype;
   const originalName = file.originalname.toLowerCase();
+  // Com memoryStorage, o conteúdo do arquivo está em file.buffer
+  const buffer = file.buffer;
 
   if (mimeType === 'text/plain' || originalName.endsWith('.txt')) {
-    return fs.readFileSync(filePath, 'utf-8');
+    return buffer.toString('utf-8');
   } else if (mimeType === 'application/pdf' || originalName.endsWith('.pdf')) {
-    const dataBuffer = fs.readFileSync(filePath);
-    const data = await pdf(dataBuffer);
+    const data = await pdf(buffer);
     return data.text;
   } else if (
     mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
     originalName.endsWith('.docx')
   ) {
-    const result = await mammoth.extractRawText({ path: filePath });
+    const result = await mammoth.extractRawText({ buffer: buffer });
     return result.value;
   }
   return null;
@@ -53,7 +53,7 @@ async function processarAnalise(req, res) {
         if (extracted) {
           textoAlvo = extracted;
           inputOriginal = `Arquivo: ${req.file.originalname}`;
-          fs.unlinkSync(req.file.path);
+          // Sem fs.unlinkSync: com memoryStorage não há arquivo em disco para deletar
         }
       }
 

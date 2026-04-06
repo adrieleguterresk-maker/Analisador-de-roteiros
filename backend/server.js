@@ -13,7 +13,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Configuração do Multer para upload temporário
-const upload = multer({ dest: 'temp/' });
+// Em serverless (Vercel), não há sistema de arquivos gravável.
+// Por isso usamos memoryStorage — os arquivos ficam em RAM como Buffer.
+const upload = multer({ storage: multer.memoryStorage() });
 
 // Permitir CORS de qualquer origem para facilitar o deploy inicial
 // (Em produção real, você pode substituir * pelo seu domínio do Netlify)
