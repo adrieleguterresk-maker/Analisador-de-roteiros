@@ -1,40 +1,50 @@
-const { exec } = require('child_process');
-const path = require('path');
-const fs = require('fs');
+const axios = require('axios');
+const instagramGetUrl = require('instagram-url-direct');
 
-// Verifica se o yt-dlp e ffmpeg estão instalados no sistema
+/**
+ * Captura o áudio/vídeo de um Reel através de Scraping de Rede (sem binários yt-dlp)
+ * Ideal para ambientes como Vercel (Serverless)
+ */
 async function downloadAudioFromReel(url) {
-  return new Promise((resolve, reject) => {
-    const timestamp = Date.now();
-    const outputPath = path.join(__dirname, '..', 'temp', `audio_${timestamp}.mp3`);
+  try {
+    console.log('--- INICIANDO CAPTURA DE VÍDEO VIA REDE ---');
     
-    // Assegura que a pasta temp existe
-    const tempDir = path.dirname(outputPath);
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
+    // 1. Tenta capturar a URL direta da mídia
+    const links = await instagramGetUrl(url);
+    
+    if (!links || !links.url_list || links.url_list.length === 0) {
+      throw new Error('Não foi possível extrair o link direto do vídeo. Verifique se o perfil é público.');
     }
 
-    // Comando do yt-dlp para extrair apenas áudio em formato mp3
-    const command = `yt-dlp -x --audio-format mp3 -o "${outputPath}" "${url}"`;
-    
-    exec(command, (error, stdout, stderr) => {
-      if (error) {
-        console.error('Erro no yt-dlp:', error);
-        return reject('Falha ao baixar áudio do Reel. Verifique se yt-dlp e ffmpeg estão instalados no sistema.');
-      }
-      resolve(outputPath);
+    // Pega o primeiro link de mídia disponível (geralmente MP4)
+    const directUrl = links.url_list[0];
+    console.log('Link direto capturado com sucesso.');
+
+    // 2. Faz o download da mídia para um Buffer (memória)
+    const response = await axios({
+      method: 'get',
+      url: directUrl,
+      responseType: 'arraybuffer',
+      timeout: 15000 // Limite de 15 segundos para download
     });
-  });
+
+    console.log('Download da mídia concluído (em memória). Tamanho:', response.data.byteLength, 'bytes');
+
+    // Retorna o buffer e o tipo para o Whisper
+    return {
+      buffer: Buffer.from(response.data),
+      name: 'video_reel.mp4'
+    };
+
+  } catch (error) {
+    console.error('Erro na captura de mídia:', error.message);
+    throw new Error(`Falha ao processar o link do vídeo: ${error.message}`);
+  }
 }
 
+// No-op para compatibilidade (não temos mais arquivos em disco para deletar)
 function cleanupAudio(filePath) {
-  try {
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-  } catch(e) {
-    console.error("Failed to delete temp audio", e);
-  }
+  // Nada a fazer com Buffers em memória
 }
 
 module.exports = {

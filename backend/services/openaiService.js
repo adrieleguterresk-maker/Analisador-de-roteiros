@@ -344,9 +344,19 @@ async function extractTextFromImages(base64Images) {
   return response.choices[0].message.content;
 }
 
-async function transcribeAudio(audioFilePath) {
+async function transcribeAudio(mediaData) {
+  // Se for um Buffer/Objeto, converte para Arquivo Virtual para a OpenAI
+  let fileToTranscribe;
+  
+  if (mediaData.buffer) {
+    fileToTranscribe = await toFile(mediaData.buffer, mediaData.name || 'audio.mp4');
+  } else {
+    // Fallback legado para caminho de arquivo (fs)
+    fileToTranscribe = fs.createReadStream(mediaData);
+  }
+
   const result = await getOpenAI().audio.transcriptions.create({
-    file: fs.createReadStream(audioFilePath),
+    file: fileToTranscribe,
     model: "whisper-1",
   });
   return result.text;

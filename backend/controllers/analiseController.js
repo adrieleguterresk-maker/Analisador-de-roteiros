@@ -57,11 +57,11 @@ async function processarAnalise(req, res) {
       }
 
       if (tipoInput === 'reel') {
-        const audioPath = await downloadAudioFromReel(texto);
-        transcricao = await transcribeAudio(audioPath);
+        const mediaData = await downloadAudioFromReel(texto);
+        transcricao = await transcribeAudio(mediaData);
         textoAlvo = transcricao;
         inputOriginal = texto; 
-        cleanupAudio(audioPath);
+        // cleanupAudio(mediaData) agora é opcional pois está em Buffer
       } else if (tipoInput === 'carrossel') {
         const images = typeof imagesRaw === 'string' ? JSON.parse(imagesRaw) : imagesRaw;
         textoAlvo = await extractTextFromImages(images);
