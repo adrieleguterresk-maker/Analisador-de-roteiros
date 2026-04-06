@@ -10,14 +10,14 @@ async function extractTextFromFile(file) {
   if (mimeType === 'text/plain' || originalName.endsWith('.txt')) {
     return buffer.toString('utf-8');
   } else if (mimeType === 'application/pdf' || originalName.endsWith('.pdf')) {
-    // pdf-parse removido por incompatibilidade com Vercel (erro DOMMatrix).
-    // TODO: Implementar extrator de PDF serverless-friendly no futuro.
-    throw new Error('No momento, PDFs não são suportados para garantir a estabilidade do sistema. Por favor, cole o texto ou use arquivos .docx / .txt.');
+    // pdf-parse restaurado com polyfill no server.js para estabilidade
+    const pdf = require('pdf-parse');
+    const data = await pdf(buffer);
+    return data.text;
   } else if (
     mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
     originalName.endsWith('.docx')
   ) {
-    // Lazy loading do mammoth para evitar crash no boot
     const mammoth = require('mammoth');
     const result = await mammoth.extractRawText({ buffer: buffer });
     return result.value;

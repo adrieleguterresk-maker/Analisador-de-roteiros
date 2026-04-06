@@ -1,3 +1,9 @@
+// --- AJUSTE CIRÚRGICO VERCEL ---
+// Polyfills básicos para evitar erro do pdf-parse (pdf.js) em ambiente node puro
+global.DOMMatrix = class {};
+global.DOMMatrixReadOnly = class {};
+// ------------------------------
+
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
@@ -11,6 +17,19 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Rota de Diagnóstico Cirúrgico
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+    env: {
+      has_openai: !!process.env.OPENAI_API_KEY,
+      has_supabase: !!process.env.SUPABASE_URL
+    }
+  });
+});
 
 // Configuração do Multer para upload temporário
 // Em serverless (Vercel), não há sistema de arquivos gravável.
