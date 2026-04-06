@@ -1,42 +1,88 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import api from '../api';
-import { CheckCircle, Wrench, Sparkles, Copy, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
+import { CheckCircle, Wrench, Sparkles, Copy, ChevronDown, ChevronUp, AlertCircle, Loader2 } from 'lucide-react';
 
 export default function ResultAnalysis() {
   const { id } = useParams();
   const location = useLocation();
   const [data, setData] = useState(location.state?.result || null);
   const [loading, setLoading] = useState(!data);
+  const [fetchError, setFetchError] = useState(null);
 
   useEffect(() => {
     if (!data) {
-      api.get(`/historico/${id}`).then(res => {
-        setData({
-          id: res.data.id,
-          transcricao: res.data.transcricao,
-          nota: res.data.nota,
-          resultado: JSON.parse(res.data.resultado_json)
+      setLoading(true);
+      api.get(`/historico/${id}`)
+        .then(res => {
+          if (!res.data || !res.data.resultado_json) {
+            throw new Error('Formato de dados inválido recebido do servidor.');
+          }
+          
+          setData({
+            id: res.data.id,
+            transcricao: res.data.transcricao,
+            nota: res.data.nota,
+            resultado: JSON.parse(res.data.resultado_json)
+          });
+          setLoading(false);
+        })
+        .catch(err => {
+          console.error('Erro ao buscar histórico:', err);
+          setFetchError(err.response?.data?.error || 'Não foi possível carregar os detalhes desta análise.');
+          setLoading(false);
         });
-        setLoading(false);
-      });
     }
   }, [id, data]);
 
-  if (loading) return <div className="p-10 text-center font-display text-xl text-brand-green">Carregando análise...</div>;
-  if (!data) return <div className="p-10 text-center text-red-600">Erro: Análise não encontrada.</div>;
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center p-20 space-y-4">
+        <Loader2 className="animate-spin text-brand-gold" size={48} />
+        <p className="font-display text-xl text-brand-brown">Carregando sua análise estratégica...</p>
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="max-w-2xl mx-auto mt-20 p-8 card-premium border-red-100 text-center space-y-4">
+        <AlertCircle size={48} className="mx-auto text-red-500" />
+        <h2 className="text-2xl font-display font-bold text-gray-900">Ops! Algo deu errado.</h2>
+        <p className="text-gray-600">{fetchError}</p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="btn-primary"
+        >
+          Tentar Novamente
+        </button>
+      </div>
+    );
+  }
+
+  if (!data || !data.resultado) {
+    return (
+      <div className="p-10 text-center text-red-600 card-premium">
+        <AlertCircle size={24} className="mx-auto mb-2" />
+        Erro Crítico: Os dados da análise estão incompletos ou corrompidos.
+      </div>
+    );
+  }
 
   const resultado = data.resultado;
-  const analisePrincipal = resultado.analises?.[0]; // Pega a primeira para o corpo padrão.
+  const analises = resultado.analises || [];
+  const analisePrincipal = analises[0] || {}; 
   const resumoExecutivo = resultado.resumo_executivo;
 
   const getNotaColor = (n) => {
+    if (!n && n !== 0) return 'text-gray-400';
     if (n >= 8) return 'text-green-600';
     if (n >= 6) return 'text-yellow-500';
     return 'text-red-600';
   };
 
   const getBadgeColor = (tipo) => {
+    if (!tipo) return 'bg-gray-200 text-gray-800';
     const t = tipo.toLowerCase();
     if (t.includes('nutella')) return 'bg-brand-brown-light text-white';
     if (t.includes('raiz')) return 'bg-brand-brown-dark text-white';
@@ -58,16 +104,16 @@ export default function ResultAnalysis() {
       <header className="flex flex-col md:flex-row items-center justify-between card-premium gap-6">
         <div>
            <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold mb-3 ${getBadgeColor(analisePrincipal.tipo_conteudo)}`}>
-              {analisePrincipal.tipo_conteudo}
+              {analisePrincipal.tipo_conteudo || 'Tipo Desconhecido'}
            </span>
            <h1 className="text-3xl font-display font-bold text-gray-900 mb-1">
-             {analisePrincipal.nicho}
+             {analisePrincipal.nicho || 'Análise de Roteiro'}
            </h1>
            <p className="text-gray-500 text-sm">Pronto para conversão</p>
         </div>
         <div className="flex flex-col items-center">
             <div className={`text-6xl font-display font-black ${getNotaColor(data.nota)}`}>
-              {data.nota?.toFixed(1)}
+              {data.nota?.toFixed(1) || '0.0'}
               <span className="text-2xl text-gray-400 font-medium">/10</span>
             </div>
             <p className="text-sm font-semibold uppercase tracking-wider text-gray-500 mt-2">Nota Geral</p>
@@ -75,11 +121,11 @@ export default function ResultAnalysis() {
       </header>
 
       {/* Tabela de Resumo Executivo (Se houver múltiplos roteiros) */}
-      {resumoExecutivo && (
+      {resumoExecutivo && resumoExecutivo.roteiros && (
         <section className="card-premium space-y-4 border-l-4 border-brand-gold">
           <h2 className="text-2xl font-display font-semibold flex items-center gap-2 text-brand-brown">
              <Sparkles className="text-brand-gold"/> 
-             Resumo da Semana ({resumoExecutivo.total_roteiros} Roteiros)
+             Resumo da Semana ({resumoExecutivo.total_roteiros || resumoExecutivo.roteiros.length} Roteiros)
           </h2>
           <p className="text-gray-700">{resumoExecutivo.prioridade_ajuste}</p>
           
@@ -93,10 +139,12 @@ export default function ResultAnalysis() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {resumoExecutivo.roteiros.sort((a,b) => a.nota - b.nota).map((rot, idx) => (
+                {resumoExecutivo.roteiros.sort((a,b) => (a.nota || 0) - (b.nota || 0)).map((rot, idx) => (
                   <tr key={idx}>
                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{rot.nome}</td>
-                     <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${getNotaColor(rot.nota)}`}>{rot.nota.toFixed(1)}</td>
+                     <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${getNotaColor(rot.nota)}`}>
+                       {rot.nota?.toFixed(1) || '0.0'}
+                     </td>
                      <td className="px-6 py-4 text-sm text-gray-500">{rot.principal_problema}</td>
                   </tr>
                 ))}
@@ -107,18 +155,19 @@ export default function ResultAnalysis() {
       )}
 
       {/* Renderizando as Análises */}
-      {resultado.analises?.map((analise, idx) => (
+      {analises.map((analise, idx) => (
         <div key={idx} className="space-y-8 bg-white/50 p-6 rounded-2xl border border-brand-gold/20">
-            {resultado.analises.length > 1 && (
+            {analises.length > 1 && (
                <h3 className="text-2xl font-display font-bold text-brand-green border-b pb-2">
-                 {analise.nome_roteiro} <span className="text-gray-400 font-medium text-lg">({analise.nota.toFixed(1)}/10)</span>
+                 {analise.nome_roteiro || `Roteiro ${idx + 1}`} 
+                 <span className="text-gray-400 font-medium text-lg ml-2">({analise.nota?.toFixed(1) || '0.0'}/10)</span>
                </h3>
             )}
 
             {/* Impressao Geral */}
             <section className="bg-white border-l-4 border-brand-green p-6 rounded-r-xl shadow-sm">
               <h3 className="text-lg font-bold text-gray-900 mb-2">Avisos da Especialista</h3>
-              <p className="text-gray-700 leading-relaxed">{analise.impressao_geral}</p>
+              <p className="text-gray-700 leading-relaxed">{analise.impressao_geral || 'Nenhuma impressão gerada.'}</p>
               <div className="mt-4 p-4 bg-gray-50 rounded-lg">
                  <p className="text-sm text-gray-600 italic"><strong>Por que essa nota?</strong> {analise.justificativa_nota}</p>
               </div>
@@ -131,12 +180,13 @@ export default function ResultAnalysis() {
                     <CheckCircle /> O que está forte ✅
                  </h2>
                  <div className="space-y-3">
-                   {analise.pontos_fortes.map((pf, i) => (
+                   {analise.pontos_fortes?.map((pf, i) => (
                       <div key={i} className="bg-green-50/50 border border-green-100 p-4 rounded-xl">
                          <h4 className="font-bold text-gray-900 mb-1">{pf.ponto}</h4>
                          <p className="text-sm text-gray-700">{pf.motivo}</p>
                       </div>
                    ))}
+                   {(!analise.pontos_fortes || analise.pontos_fortes.length === 0) && <p className="text-gray-400 italic">Não foram detectados pontos fortes específicos.</p>}
                  </div>
               </section>
 
@@ -146,7 +196,7 @@ export default function ResultAnalysis() {
                     <Wrench /> O que ajustar 🔧
                  </h2>
                  <div className="space-y-4">
-                   {analise.pontos_ajuste.map((pa, i) => (
+                   {analise.pontos_ajuste?.map((pa, i) => (
                       <div key={i} className="card-premium p-5 space-y-3 relative overflow-hidden">
                          <div className="absolute top-0 left-0 w-1 h-full bg-brand-gold"></div>
                          <span className="text-xs font-bold uppercase tracking-widest text-brand-brown">{pa.elemento}</span>
@@ -161,6 +211,7 @@ export default function ResultAnalysis() {
                          </p>
                       </div>
                    ))}
+                   {(!analise.pontos_ajuste || analise.pontos_ajuste.length === 0) && <p className="text-gray-400 italic">Nenhum ajuste sugerido no momento.</p>}
                  </div>
               </section>
             </div>
@@ -221,7 +272,7 @@ function CollapsibleSection({ title, items }) {
                          <span className="text-[10px] font-bold uppercase tracking-wider text-green-500">Sugestão Julia Ottoni:</span>
                          <div className="bg-green-50 border border-green-200 p-3 rounded-lg text-sm font-medium text-gray-800 pr-10 whitespace-pre-wrap">
                             {item.sugerido}
-                         </div>
+                          </div>
                          <button 
                            onClick={() => {
                              navigator.clipboard.writeText(item.sugerido);
