@@ -3,7 +3,6 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const multer = require('multer');
 const path = require('path');
-const { getDbConnection } = require('./database/database');
 const analiseController = require('./controllers/analiseController');
 const extrairController = require('./controllers/extrairController');
 const historicoController = require('./controllers/historicoController');
@@ -16,7 +15,10 @@ const PORT = process.env.PORT || 3000;
 // Configuração do Multer para upload temporário
 const upload = multer({ dest: 'temp/' });
 
-app.use(cors());
+// Permitir CORS de qualquer origem para facilitar o deploy inicial
+// (Em produção real, você pode substituir * pelo seu domínio do Netlify)
+app.use(cors({ origin: '*' })); 
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -34,9 +36,18 @@ app.get('/api/historico', historicoController.listarHistorico);
 app.get('/api/historico/:id', historicoController.detalheAnalise);
 app.delete('/api/historico/:id', historicoController.excluirAnalise);
 
+const { supabase } = require('./database/supabase');
+
 async function startServer() {
   try {
-    await getDbConnection();
+    // Verificação simples de conexão com Supabase no boot
+    const { data, error } = await supabase.from('analises').select('id').limit(1);
+    if (error) {
+      console.warn('AVISO: Não foi possível conectar ao Supabase no início:', error.message);
+    } else {
+      console.log('Conexão com Supabase estabelecida com sucesso.');
+    }
+
     app.listen(PORT, () => {
       console.log(`Servidor backend rodando na porta ${PORT}`);
     });

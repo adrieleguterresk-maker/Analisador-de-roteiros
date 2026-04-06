@@ -1,6 +1,6 @@
 const { analisarRoteiroTexto, extractTextFromImages, transcribeAudio } = require('../services/openaiService');
 const { downloadAudioFromReel, cleanupAudio } = require('../services/mediaService');
-const { getDbConnection } = require('../database/database');
+const { supabase } = require('../database/supabase');
 const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
 const fs = require('fs');
@@ -79,7 +79,6 @@ async function processarAnalise(req, res) {
     }
 
     const jsonAnalise = await analisarRoteiroTexto(listaRoteiros, nicho);
-    const db = await getDbConnection();
 
     const roteirosData = jsonAnalise.analises || [];
     const resumoExecutivo = jsonAnalise.resumo_executivo || null;
@@ -89,20 +88,40 @@ async function processarAnalise(req, res) {
        notaPrincipal = resumoExecutivo.media_notas;
     }
 
-    const { lastID: analiseId } = await db.run(
-      `INSERT INTO analises (tipo_input, tipo_conteudo, nicho, input_original, transcricao, resultado_json, nota) 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [tipoInput, listaRoteiros[0].tipoConteudo, nicho, inputOriginal, transcricao, JSON.stringify(jsonAnalise), notaPrincipal]
-    );
+    // Inserir análise principal
+    const { data: analiseRecord, error: analiseError } = await supabase
+      .from('analises')
+      .insert({
+        tipo_input: tipoInput,
+        tipo_conteudo: listaRoteiros[0].tipoConteudo,
+        nicho: nicho,
+        input_original: inputOriginal,
+        transcricao: transcricao,
+        resultado_json: jsonAnalise,
+        nota: notaPrincipal
+      })
+      .select()
+      .single();
 
+    if (analiseError) throw analiseError;
+
+    const analiseId = analiseRecord.id;
+
+    // Inserir roteiros múltiplos se houver
     if (roteirosData.length > 1 && resumoExecutivo) {
-      for (const roteiro of roteirosData) {
-        await db.run(
-          `INSERT INTO roteiros_multiplos (analise_id, nome_roteiro, nota, principal_problema, analise_json)
-           VALUES (?, ?, ?, ?, ?)`,
-          [analiseId, roteiro.nome_roteiro, roteiro.nota, '', JSON.stringify(roteiro)]
-        );
-      }
+      const inserts = roteirosData.map(roteiro => ({
+        analise_id: analiseId,
+        nome_roteiro: roteiro.nome_roteiro,
+        nota: roteiro.nota,
+        principal_problema: '',
+        analise_json: roteiro
+      }));
+
+      const { error: multiError } = await supabase
+        .from('roteiros_multiplos')
+        .insert(inserts);
+
+      if (multiError) throw multiError;
     }
 
     res.json({
