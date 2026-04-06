@@ -43,32 +43,32 @@ async function processarAnalise(req, res) {
     let inputOriginal = '';
     let transcricao = null;
 
-    // Caso 1: Usuário enviou roteiros já splitados e configurados individualmente
+    console.log('--- ETAPA 1: CAPTURA DE MÍDIA ---');
     if (roteirosRaw) {
       listaRoteiros = typeof roteirosRaw === 'string' ? JSON.parse(roteirosRaw) : roteirosRaw;
       inputOriginal = `Lote de ${listaRoteiros.length} roteiros com tipos individuais.`;
     } 
-    // Caso 2: Fluxo legado ou Reel/Carrossel (único tipo para o input)
     else {
       let textoAlvo = texto || '';
       inputOriginal = texto;
 
       if (req.file) {
+        console.log('Detectado arquivo de upload.');
         const extracted = await extractTextFromFile(req.file);
         if (extracted) {
           textoAlvo = extracted;
           inputOriginal = `Arquivo: ${req.file.originalname}`;
-          // Sem fs.unlinkSync: com memoryStorage não há arquivo em disco para deletar
         }
       }
 
       if (tipoInput === 'reel') {
+        console.log('Iniciando processamento de Reel URL.');
         const mediaData = await downloadAudioFromReel(texto);
         transcricao = await transcribeAudio(mediaData);
         textoAlvo = transcricao;
         inputOriginal = texto; 
-        // cleanupAudio(mediaData) agora é opcional pois está em Buffer
       } else if (tipoInput === 'carrossel') {
+        console.log('Iniciando processamento de Carrossel.');
         const images = typeof imagesRaw === 'string' ? JSON.parse(imagesRaw) : imagesRaw;
         textoAlvo = await extractTextFromImages(images);
         inputOriginal = 'Imagens enviadas via Base64';
@@ -79,10 +79,10 @@ async function processarAnalise(req, res) {
         return res.status(400).json({ error: "Nenhum texto para análise encontrado." });
       }
 
-      // Se houver apenas um texto, encapsulamos no formato de lista
       listaRoteiros = [{ texto: textoAlvo, tipoConteudo, nome: 'Roteiro Principal' }];
     }
 
+    console.log('--- ETAPA 2: CHAMADA OPENAI (IA) ---');
     const jsonAnalise = await analisarRoteiroTexto(listaRoteiros, nicho);
 
     const roteirosData = jsonAnalise.analises || [];
@@ -93,7 +93,7 @@ async function processarAnalise(req, res) {
        notaPrincipal = resumoExecutivo.media_notas;
     }
 
-    // Inserir análise principal
+    console.log('--- ETAPA 3: GRAVAÇÃO SUPABASE (BANCO) ---');
     const { data: analiseRecord, error: analiseError } = await supabase
       .from('analises')
       .insert({
@@ -108,12 +108,19 @@ async function processarAnalise(req, res) {
       .select()
       .single();
 
-    if (analiseError) throw analiseError;
+    if (analiseError) {
+      console.error('ERRO ESPECÍFICO SUPABASE:', JSON.stringify(analiseError));
+      throw new Error(`Falha no Banco de Dados: ${analiseError.message}`);
+    }
+
+    if (!analiseRecord) {
+      throw new Error('O banco de dados não retornou o registro criado.');
+    }
 
     const analiseId = analiseRecord.id;
 
-    // Inserir roteiros múltiplos se houver
     if (roteirosData.length > 1 && resumoExecutivo) {
+      console.log('Gravando roteiros múltiplos no banco.');
       const inserts = roteirosData.map(roteiro => ({
         analise_id: analiseId,
         nome_roteiro: roteiro.nome_roteiro,
@@ -122,13 +129,10 @@ async function processarAnalise(req, res) {
         analise_json: roteiro
       }));
 
-      const { error: multiError } = await supabase
-        .from('roteiros_multiplos')
-        .insert(inserts);
-
-      if (multiError) throw multiError;
+      await supabase.from('roteiros_multiplos').insert(inserts);
     }
 
+    console.log('--- ANÁLISE CONCLUÍDA COM SUCESSO ---');
     res.json({
       id: analiseId,
       transcricao: transcricao,
@@ -137,13 +141,9 @@ async function processarAnalise(req, res) {
     });
 
   } catch (error) {
-    // LOG DETALHADO PARA O USUÁRIO VER NA VERCEL
     console.error('--- ERRO DETALHADO NO SERVIDOR ---');
     console.error('Mensagem:', error.message);
-    console.error('Stack:', error.stack);
-    if (error.response?.data) {
-      console.error('Dados da OpenAI/API:', JSON.stringify(error.response.data));
-    }
+    console.error('Fase da Falha:', error.stack?.split('\n')[1] || 'Desconhecida');
     console.error('----------------------------------');
 
     let msg = 'Erro inesperado no servidor. Tente novamente mais tarde.';
