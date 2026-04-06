@@ -145,19 +145,22 @@ export default function Home() {
         navigate(`/analise/${response.data.id}`, { state: { result: response.data } });
       }
     } catch (err) {
-      console.error('Erro detalhado:', err);
-      let msg = "Falha ao conectar com o servidor.";
+      console.error('Análise falhou.');
+      let msg = "Não foi possível realizar a análise no momento.";
       
-      if (err.response?.data?.error) {
-        msg = typeof err.response.data.error === 'string' 
-          ? err.response.data.error 
-          : JSON.stringify(err.response.data.error);
-      } else if (err.message) {
-        msg = err.message;
+      const errorData = err.response?.data?.error;
+      const statusCode = err.response?.status;
+      
+      if (statusCode === 504 || (typeof errorData === 'string' && errorData.includes('504'))) {
+        msg = "O tempo de resposta expirou. Tente enviar um roteiro menor.";
+      } else if (statusCode === 429) {
+        msg = "O serviço está com alta demanda. Tente novamente em alguns instantes.";
+      } else if (statusCode === 500) {
+        msg = "Ocorreu um erro interno de processamento. Tente novamente mais tarde.";
+      } else if (typeof errorData === 'string' && errorData.length < 100) {
+        // Se a mensagem for pequena e não parecer técnica, podemos mostrar
+        msg = errorData;
       }
-      
-      if (msg.includes('504')) msg = "O servidor demorou muito para responder (Timeout). Tente um roteiro mais curto.";
-      if (msg.includes('500')) msg = "Erro interno no servidor (500). Verifique as chaves de API.";
       
       setErrorStatus(msg);
     } finally {

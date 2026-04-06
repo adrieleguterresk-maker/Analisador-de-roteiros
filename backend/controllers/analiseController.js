@@ -132,14 +132,16 @@ async function processarAnalise(req, res) {
     });
 
   } catch (error) {
-    console.error('ERRO INTERNO:', error.message);
-    let msg = 'Falha interna durante a análise.';
+    console.error('ERRO INTERNO NO SERVIDOR:', error.message);
+    let msg = 'Erro inesperado no servidor. Tente novamente mais tarde.';
     
-    // Sugestão de correção conforme o tipo de erro (sem vazar a chave)
+    // As mensagens específicas do erro vão para os logs da Vercel (onde só você vê)
     if (error.message?.includes('401') || error.message?.includes('auth') || error.status === 401) {
-      msg = 'Erro de autenticação: Verifique se sua Chave API no arquivo .env está correta e ativa.';
+      msg = 'Desculpe, ocorreu uma instabilidade em nossos serviços de autenticação.';
     } else if (error.message?.includes('429') || error.status === 429) {
-      msg = 'Limite excedido ou créditos insuficientes na sua conta OpenAI.';
+      msg = 'O serviço está com alta demanda no momento. Aguarde e tente novamente.';
+    } else if (error.message?.includes('timeout') || error.status === 504) {
+      msg = 'O processamento do seu roteiro demorou muito. Tente enviar um texto menor.';
     }
 
     res.status(500).json({ error: msg });
