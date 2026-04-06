@@ -132,12 +132,20 @@ async function processarAnalise(req, res) {
     });
 
   } catch (error) {
-    console.error('ERRO INTERNO NO SERVIDOR:', error.message);
+    // LOG DETALHADO PARA O USUÁRIO VER NA VERCEL
+    console.error('--- ERRO DETALHADO NO SERVIDOR ---');
+    console.error('Mensagem:', error.message);
+    console.error('Stack:', error.stack);
+    if (error.response?.data) {
+      console.error('Dados da OpenAI/API:', JSON.stringify(error.response.data));
+    }
+    console.error('----------------------------------');
+
     let msg = 'Erro inesperado no servidor. Tente novamente mais tarde.';
     
-    // As mensagens específicas do erro vão para os logs da Vercel (onde só você vê)
+    // Filtros de segurança para o usuário final
     if (error.message?.includes('401') || error.message?.includes('auth') || error.status === 401) {
-      msg = 'Desculpe, ocorreu uma instabilidade em nossos serviços de autenticação.';
+      msg = 'Desculpe, ocorreu uma instabilidade na autenticação dos serviços.';
     } else if (error.message?.includes('429') || error.status === 429) {
       msg = 'O serviço está com alta demanda no momento. Aguarde e tente novamente.';
     } else if (error.message?.includes('timeout') || error.status === 504) {
